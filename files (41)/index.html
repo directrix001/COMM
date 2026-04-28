@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Variance Analysis Tool</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="va-header">
+  <div class="va-header-logo"><span class="logo-nissan">NISSAN</span></div>
+  <div class="va-header-center">
+    <div class="va-header-title">Variance <em>Analysis</em> Tool</div>
+    <div class="va-header-sub">Finance Data Pipeline · Scenario Intelligence</div>
+  </div>
+  <div class="va-header-logo"><span class="logo-genpact">GENPACT</span></div>
+</header>
+
+<!-- MAIN -->
+<main class="va-main">
+
+  <!-- TAB NAV -->
+  <nav class="va-tabnav">
+    <div class="va-tabnav-inner">
+      <button class="va-tab active" data-tab="tab1"><i class="bi bi-folder2-open"></i> Tagetik Mapping</button>
+      <button class="va-tab" data-tab="tab2"><i class="bi bi-graph-up-arrow"></i> Variance Analysis</button>
+      <button class="va-tab" data-tab="tab3"><i class="bi bi-robot"></i> Commentary Generator</button>
+      <button class="va-tab" data-tab="tab4"><i class="bi bi-chat-dots"></i> Chat with Data</button>
+      <button class="va-tab" data-tab="tab5"><i class="bi bi-database"></i> Run History</button>
+      <button class="va-tab" data-tab="tab6"><i class="bi bi-search"></i> Comment Search</button>
+      <button class="va-tab" data-tab="tab7"><i class="bi bi-upload"></i> PPT Upload</button>
+    </div>
+  </nav>
+
+  <!-- TAB PANELS — all 7 wired -->
+  <div class="va-tab-content">
+    <div id="tab1" class="va-panel active"><div id="tab1-content"></div></div>
+    <div id="tab2" class="va-panel"><div id="tab2-content"></div></div>
+    <div id="tab3" class="va-panel"><div id="tab3-content"></div></div>
+    <div id="tab4" class="va-panel"><div id="tab4-content"></div></div>
+    <div id="tab5" class="va-panel"><div id="tab5-content"></div></div>
+    <div id="tab6" class="va-panel"><div id="tab6-content"></div></div>
+    <div id="tab7" class="va-panel"><div id="tab7-content"></div></div>
+  </div>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="va-footer">
+  <span>© 2025 Genpact · Nissan Partnership</span>
+  <span class="sep">|</span>
+  <span>Variance Analysis Platform</span>
+  <span class="sep">|</span>
+  <span>Confidential &amp; Proprietary</span>
+  <span class="sep">|</span>
+  <a href="#">Privacy Policy</a>
+  <span class="sep">|</span>
+  <a href="#">Support</a>
+</footer>
+
+<!-- TOAST -->
+<div id="va-toast-wrap" class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="va-toast" class="toast align-items-center border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="va-toast-body">Message</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/core.js"></script>
+<script src="/static/js/tab1.js"></script>
+<script src="/static/js/tab2.js"></script>
+<script src="/static/js/tab3.js"></script>
+<script src="/static/js/tab4.js"></script>
+<script src="/static/js/tab5.js"></script>
+<script src="/static/js/tab6.js"></script>
+<script src="/static/js/tab7.js"></script>
+</body>
+</html>
