@@ -1,0 +1,1030 @@
+/**
+ * tab4.js — Chat with Data
+ * UPDATED: Persona-aware suggested prompts driven by Tab 3 selection.
+ * Reads window.__va_persona (set by tab3.js on every persona change).
+ * POST /api/tab4/ask      → Q&A answer
+ * DELETE /api/tab4/clear  → clear history
+ */
+(function () {
+  'use strict';
+  let initialised = false;
+
+  // ── PERSONA-AWARE PROMPT LIBRARY ──────────────────────────────────────
+  const PERSONA_PROMPTS = {
+
+    CFO: {
+      label: "CFO",
+      color: "#2563eb",
+      groups: [
+        {
+          label: "P&L Impact",
+          icon: "bi-bar-chart-line-fill",
+          color: "#2563eb",
+          prompts: [
+            "What is the total net variance and its P&L impact?",
+            "Which cost category is driving the most adverse variance?",
+            "How does this variance compare as a % of total budget?",
+            "What is the bottom-line impact if we do nothing?",
+          ],
+        },
+        {
+          label: "Risk & Exposure",
+          icon: "bi-shield-exclamation",
+          color: "#dc2626",
+          prompts: [
+            "What are the top 3 financial risks in this data?",
+            "Which regions or divisions are most exposed?",
+            "Are there any variance spikes that signal structural issues?",
+            "What is our worst-case scenario based on current trends?",
+          ],
+        },
+        {
+          label: "Strategic Actions",
+          icon: "bi-arrow-up-right-circle",
+          color: "#059669",
+          prompts: [
+            "What immediate corrective actions should I prioritise?",
+            "Which areas offer the fastest cost recovery opportunity?",
+            "Summarise the key messages for a board presentation",
+            "What does this variance tell us about our strategic direction?",
+          ],
+        },
+        {
+          label: "Executive Summary",
+          icon: "bi-file-earmark-text",
+          color: "#7c3aed",
+          prompts: [
+            "Give me a 3-bullet executive summary of this variance",
+            "What is the single biggest story in this data?",
+            "Compare performance across the top 3 divisions in one sentence each",
+            "What should I highlight to the Board this quarter?",
+          ],
+        },
+      ],
+    },
+
+    VP_FINANCE: {
+      label: "VP Finance",
+      color: "#0891b2",
+      groups: [
+        {
+          label: "Budget vs Actual",
+          icon: "bi-graph-up-arrow",
+          color: "#0891b2",
+          prompts: [
+            "Show budget vs actual variance by cost category",
+            "Which departments are over budget and by how much?",
+            "What is the YTD spend vs plan across all divisions?",
+            "Identify the top 5 budget overruns with their drivers",
+          ],
+        },
+        {
+          label: "Cost Control",
+          icon: "bi-scissors",
+          color: "#dc2626",
+          prompts: [
+            "Where are the biggest cost-control opportunities?",
+            "Which OH costs are running above benchmark?",
+            "Break down procured services variance by region",
+            "What travel & meals spend is above threshold?",
+          ],
+        },
+        {
+          label: "FP&A Insights",
+          icon: "bi-calculator",
+          color: "#059669",
+          prompts: [
+            "What is the variance trend across all available months?",
+            "Forecast full-year variance based on current run-rate",
+            "Which line items need reforecast this quarter?",
+            "Show me the waterfall of variances from plan to actual",
+          ],
+        },
+        {
+          label: "Reporting",
+          icon: "bi-clipboard-data",
+          color: "#7c3aed",
+          prompts: [
+            "Summarise in 4 bullets for the monthly finance pack",
+            "What commentary should I include in the CFO dashboard?",
+            "Which variances need management explanation this period?",
+            "List variances that exceed the materiality threshold of 5%",
+          ],
+        },
+      ],
+    },
+
+    BUSINESS_PARTNER: {
+      label: "Biz Partner",
+      color: "#059669",
+      groups: [
+        {
+          label: "Root Cause",
+          icon: "bi-diagram-3",
+          color: "#059669",
+          prompts: [
+            "What is the primary root cause of the largest variance?",
+            "Which operational activities are driving cost overruns?",
+            "Break down the variance by function and explain each",
+            "What changed this period compared to last period?",
+          ],
+        },
+        {
+          label: "Team Actions",
+          icon: "bi-people-fill",
+          color: "#0891b2",
+          prompts: [
+            "Which teams need to take corrective action and why?",
+            "What specific actions can reduce the adverse variance?",
+            "Which cost categories can be deferred to next quarter?",
+            "Who owns the largest overspend and what should they do?",
+          ],
+        },
+        {
+          label: "Operational Detail",
+          icon: "bi-gear",
+          color: "#d97706",
+          prompts: [
+            "Show variance breakdown by department within each division",
+            "Which procurement categories are over plan?",
+            "Break down headcount-related costs vs non-headcount",
+            "Compare this region's performance to others",
+          ],
+        },
+        {
+          label: "Narrative",
+          icon: "bi-chat-quote",
+          color: "#7c3aed",
+          prompts: [
+            "Write a 2-paragraph business narrative for this variance",
+            "What context should I give the VP when presenting this?",
+            "Summarise what happened and what we are doing about it",
+            "Draft talking points for the next business review",
+          ],
+        },
+      ],
+    },
+
+    BOARD: {
+      label: "Board/Exec",
+      color: "#7c3aed",
+      groups: [
+        {
+          label: "Key Messages",
+          icon: "bi-award-fill",
+          color: "#7c3aed",
+          prompts: [
+            "What are the 3 key messages for the Board this quarter?",
+            "Summarise overall performance in 2 sentences",
+            "What is the strategic implication of this variance?",
+            "How does this compare to our investor commitments?",
+          ],
+        },
+        {
+          label: "Performance",
+          icon: "bi-speedometer2",
+          color: "#0891b2",
+          prompts: [
+            "How is overall performance tracking against annual plan?",
+            "Which markets are outperforming and which are lagging?",
+            "What percentage of the portfolio is on track?",
+            "Show the high-level variance split: favourable vs adverse",
+          ],
+        },
+        {
+          label: "Risk & Opportunity",
+          icon: "bi-lightning-charge",
+          color: "#dc2626",
+          prompts: [
+            "What are the top strategic risks in this data?",
+            "Where are the growth or savings opportunities?",
+            "What needs Board-level decision or escalation?",
+            "Which trends should concern the Board most?",
+          ],
+        },
+        {
+          label: "Governance",
+          icon: "bi-shield-check",
+          color: "#059669",
+          prompts: [
+            "Are there any control or compliance concerns in this data?",
+            "Which variances require Board approval to address?",
+            "What governance actions should be logged this period?",
+            "Summarise the key accountability owners for each risk",
+          ],
+        },
+      ],
+    },
+
+    AUDITOR: {
+      label: "Audit",
+      color: "#dc2626",
+      groups: [
+        {
+          label: "Materiality",
+          icon: "bi-shield-check",
+          color: "#dc2626",
+          prompts: [
+            "Which variances exceed the materiality threshold of €500K?",
+            "List all line items with variance > 10% of plan",
+            "Are there any zero-balance items that should have activity?",
+            "Which cost categories have unexplained variances?",
+          ],
+        },
+        {
+          label: "Control Checks",
+          icon: "bi-search",
+          color: "#d97706",
+          prompts: [
+            "Identify any duplicate or anomalous entries in the data",
+            "Which departments show unusual spending patterns?",
+            "Are there any transactions outside the normal range?",
+            "Show me all rows where actual exceeds budget by more than 20%",
+          ],
+        },
+        {
+          label: "Evidence Trail",
+          icon: "bi-file-earmark-ruled",
+          color: "#0891b2",
+          prompts: [
+            "List all variances that need documented justification",
+            "Which line items have missing or incomplete data?",
+            "Show row count and completeness across all key columns",
+            "What data quality issues exist that could affect the audit?",
+          ],
+        },
+        {
+          label: "JSOX / Compliance",
+          icon: "bi-clipboard2-check",
+          color: "#7c3aed",
+          prompts: [
+            "Which variances require JSOX control documentation?",
+            "Are there any intercompany recharges that seem unusual?",
+            "List all provisions and accruals in this dataset",
+            "What follow-up procedures should I recommend?",
+          ],
+        },
+      ],
+    },
+
+    FP_A: {
+      label: "FP&A Analyst",
+      color: "#d97706",
+      groups: [
+        {
+          label: "Driver Analysis",
+          icon: "bi-calculator",
+          color: "#d97706",
+          prompts: [
+            "Show me the full driver tree for the top variance",
+            "What percentage of total variance comes from the top 3 drivers?",
+            "Break down volume vs price vs mix effects in the variance",
+            "Which drivers are one-time vs recurring?",
+          ],
+        },
+        {
+          label: "Trend & Forecast",
+          icon: "bi-graph-up",
+          color: "#0891b2",
+          prompts: [
+            "What is the month-on-month variance trend?",
+            "Project the full-year variance based on current run-rate",
+            "Which cost lines are accelerating vs decelerating?",
+            "Show cumulative YTD variance vs plan for each month",
+          ],
+        },
+        {
+          label: "Data Deep-Dive",
+          icon: "bi-table",
+          color: "#059669",
+          prompts: [
+            "Show summary statistics for all numeric columns",
+            "Which rows have the highest absolute delta values?",
+            "How many unique entities, divisions and functions are in the data?",
+            "Show the distribution of variance across cost categories",
+          ],
+        },
+        {
+          label: "Model Support",
+          icon: "bi-diagram-2",
+          color: "#7c3aed",
+          prompts: [
+            "What assumptions are implied by the current variance pattern?",
+            "Which line items should I include in a sensitivity analysis?",
+            "Identify cost categories suitable for zero-based budgeting",
+            "What correlations exist between the highest-variance categories?",
+          ],
+        },
+      ],
+    },
+
+  };
+
+  const DEFAULT_GROUPS = PERSONA_PROMPTS.CFO.groups;
+  let activeGroup = 0;
+
+  function getCurrentPersona() {
+    const pid = window.__va_persona || 'CFO';
+    return PERSONA_PROMPTS[pid] || PERSONA_PROMPTS.CFO;
+  }
+
+  // ── BUILD HTML ────────────────────────────────────────────────────────
+  function buildHTML() {
+    return `
+<div class="va-section-label"><i class="bi bi-chat-dots"></i> Chat with Your Data</div>
+<p style="font-size:.82rem;color:var(--text-muted);margin-bottom:10px">
+  Ask natural language questions about your loaded dataset. 
+  Suggested prompts are tuned to the <strong>audience persona</strong> selected in Tab 3.
+</p>
+
+<div class="t4-persona-banner" id="t4-persona-banner">
+  <i class="bi bi-person-badge" id="t4-banner-icon"></i>
+  <div>
+    <span style="font-weight:700;font-size:.8rem" id="t4-banner-name">CFO</span>
+    <span style="font-size:.73rem;color:var(--text-muted);margin-left:6px" id="t4-banner-hint">
+      — prompts tuned to strategic, high-level questions
+    </span>
+  </div>
+  <a href="#" id="t4-banner-change" style="font-size:.72rem;color:var(--blue);margin-left:auto;text-decoration:none">
+    Change in Tab 3 →
+  </a>
+</div>
+
+<div class="t4-source-status" id="t4-source-status">
+  <i class="bi bi-info-circle"></i>
+  <span>No data loaded yet. Run Tab 1 mapping or Tab 2 variance analysis first.</span>
+</div>
+
+<div id="t4-chat-window" class="t4-chat-window">
+  <div class="t4-msg t4-assistant">
+    <div class="t4-avatar"><i class="bi bi-robot"></i></div>
+    <div class="t4-bubble" id="t4-welcome-msg">
+      👋 Hi! I'm ready to answer questions about your data.<br>
+      Pick a <strong>suggested prompt</strong> below or type your own.
+    </div>
+  </div>
+</div>
+
+<div id="t4-alert" class="va-alert mb-2"></div>
+
+<div class="t4-suggestions" id="t4-suggestions">
+  <div class="t4-group-tabs" id="t4-group-tabs"></div>
+  <div class="t4-prompt-chips" id="t4-prompt-chips"></div>
+</div>
+
+<div class="t4-input-row">
+  <div class="t4-input-wrap">
+    <input class="t4-input" id="t4-input"
+      placeholder="Ask your dataset a question… (Enter to send)" />
+  </div>
+  <button class="btn-va-primary t4-send-btn" id="t4-btn-send">
+    <i class="bi bi-send-fill"></i>
+  </button>
+  <button class="btn-va-outline t4-clear-btn" id="t4-btn-clear" title="Clear chat">
+    <i class="bi bi-trash3"></i>
+  </button>
+</div>
+
+<style>
+/* ── Persona banner ──────────────────────────────────────────── */
+.t4-persona-banner{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 14px;border-radius:8px;
+  border:1.5px solid var(--border);background:#fff;
+  margin-bottom:8px;font-size:.82rem;
+  transition:border-color .2s,background .2s;
+}
+/* ── Source status ──────────────────────────────────────────── */
+.t4-source-status{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 12px;border-radius:8px;font-size:.78rem;margin-bottom:10px;
+  background:#fffbeb;border:1px solid #fbbf24;color:#92400e;
+}
+.t4-source-status.ok{background:#ecfdf5;border-color:#6ee7b7;color:#065f46}
+/* ── Chat window ─────────────────────────────────────────────── */
+.t4-chat-window{
+  background:#f8faff;border:1px solid var(--border);border-radius:10px;
+  height:420px;overflow-y:auto;padding:14px 16px;margin-bottom:10px;
+  display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;
+}
+/* ── Messages ─────────────────────────────────────────────────── */
+.t4-msg{display:flex;gap:10px;align-items:flex-start}
+.t4-user{flex-direction:row-reverse}
+.t4-avatar{
+  width:30px;height:30px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--navy2);color:#fff;font-size:.8rem;
+  box-shadow:0 2px 6px rgba(0,0,0,.12);
+}
+.t4-user .t4-avatar{background:var(--blue)}
+.t4-bubble{
+  max-width:78%;padding:11px 15px;border-radius:14px;
+  font-size:.8rem;line-height:1.6;word-break:break-word;
+  box-shadow:0 1px 4px rgba(0,0,0,.07);
+}
+.t4-assistant .t4-bubble{
+  background:#fff;color:var(--text);
+  border-bottom-left-radius:3px;
+  border:1px solid #e8edf5;
+}
+.t4-user .t4-bubble{
+  background:linear-gradient(135deg,#2563eb,#1d4ed8);
+  color:#fff;border-bottom-right-radius:3px;
+}
+.t4-typing .t4-bubble{opacity:.6;font-style:italic}
+
+/* ══════════════════════════════════════════════════════════════
+   RICH RESPONSE RENDERER STYLES
+══════════════════════════════════════════════════════════════ */
+
+/* ── Rendered response wrapper ── */
+.t4-rich{font-size:.81rem;line-height:1.65;color:var(--text)}
+
+/* ── Headings inside responses ── */
+.t4-rich h1,.t4-rich h2,.t4-rich h3{
+  font-weight:700;margin:12px 0 6px;line-height:1.3;
+}
+.t4-rich h1{font-size:.95rem;color:#1e3a5f;border-bottom:2px solid #dbeafe;padding-bottom:4px}
+.t4-rich h2{font-size:.88rem;color:#1e3a5f;border-bottom:1px solid #e5e7eb;padding-bottom:3px}
+.t4-rich h3{font-size:.83rem;color:#374151}
+
+/* ── Paragraphs ── */
+.t4-rich p{margin:0 0 8px}
+
+/* ── Bold / Italic ── */
+.t4-rich strong{font-weight:700;color:#111827}
+.t4-rich em{font-style:italic;color:#4b5563}
+
+/* ── Bullet & ordered lists ── */
+.t4-rich ul,.t4-rich ol{margin:4px 0 8px 0;padding-left:20px}
+.t4-rich li{
+  margin-bottom:4px;padding-left:4px;
+  position:relative;
+}
+.t4-rich ul li::marker{color:var(--blue)}
+
+/* ── Inline code ── */
+.t4-rich code{
+  background:#f0f4ff;border:1px solid #dbeafe;border-radius:4px;
+  padding:1px 5px;font-size:.76rem;font-family:'Courier New',monospace;color:#2563eb;
+}
+
+/* ── Blockquote / callout ── */
+.t4-rich blockquote{
+  border-left:3px solid var(--blue);
+  background:#f0f6ff;margin:8px 0;
+  padding:8px 12px;border-radius:0 6px 6px 0;
+  font-style:italic;color:#374151;font-size:.79rem;
+}
+
+/* ── Horizontal rule ── */
+.t4-rich hr{border:none;border-top:1px solid #e5e7eb;margin:10px 0}
+
+/* ── DATA TABLE ─────────────────────────────────────────────── */
+.t4-table-wrap{
+  overflow-x:auto;margin:10px 0;border-radius:8px;
+  border:1px solid #dbeafe;box-shadow:0 2px 8px rgba(37,99,235,.06);
+}
+.t4-rich table{
+  width:100%;border-collapse:collapse;font-size:.76rem;
+  background:#fff;
+}
+.t4-rich thead tr{
+  background:linear-gradient(90deg,#1e40af,#2563eb);color:#fff;
+}
+.t4-rich thead th{
+  padding:9px 13px;text-align:left;font-weight:600;
+  white-space:nowrap;letter-spacing:.02em;font-size:.74rem;
+}
+.t4-rich thead th:first-child{border-radius:7px 0 0 0}
+.t4-rich thead th:last-child{border-radius:0 7px 0 0}
+.t4-rich tbody tr{border-bottom:1px solid #f0f4ff;transition:background .1s}
+.t4-rich tbody tr:last-child{border-bottom:none}
+.t4-rich tbody tr:hover{background:#f0f6ff}
+.t4-rich tbody tr:nth-child(even){background:#f8faff}
+.t4-rich tbody tr:nth-child(even):hover{background:#eef2ff}
+.t4-rich td{
+  padding:8px 13px;vertical-align:top;color:#374151;
+}
+/* ── numeric cell alignment ── */
+.t4-rich td.t4-num{text-align:right;font-variant-numeric:tabular-nums;font-weight:500}
+/* ── variance colouring ── */
+.t4-rich td.t4-pos{color:#059669;font-weight:600}
+.t4-rich td.t4-neg{color:#dc2626;font-weight:600}
+
+/* ── KPI CARD ROW ──────────────────────────────────────────── */
+.t4-kpi-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.t4-kpi-card{
+  flex:1;min-width:100px;
+  background:#fff;border:1px solid #dbeafe;border-radius:10px;
+  padding:10px 14px;text-align:center;
+  box-shadow:0 1px 4px rgba(37,99,235,.07);
+}
+.t4-kpi-card .t4-kpi-val{
+  font-size:1.1rem;font-weight:700;color:#1e40af;line-height:1.2;
+}
+.t4-kpi-card .t4-kpi-lbl{font-size:.67rem;color:var(--text-muted);margin-top:2px}
+
+/* ── CALLOUT / INSIGHT BOX ─────────────────────────────────── */
+.t4-callout{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:10px 13px;border-radius:8px;margin:8px 0;font-size:.78rem;
+}
+.t4-callout-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+.t4-callout-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.t4-callout-danger{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.t4-callout-success{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+.t4-callout i{margin-top:1px;font-size:.85rem;flex-shrink:0}
+
+/* ── NUMBERED STEP LIST ────────────────────────────────────── */
+.t4-steps{list-style:none;padding:0;margin:8px 0}
+.t4-steps li{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:6px 0;border-bottom:1px dashed #e5e7eb;font-size:.79rem;
+}
+.t4-steps li:last-child{border-bottom:none}
+.t4-steps .t4-step-num{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  background:var(--blue);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.68rem;font-weight:700;
+}
+
+/* ── Suggestions ─────────────────────────────────────────────── */
+.t4-suggestions{
+  background:#fff;border:1px solid var(--border);border-radius:10px;
+  padding:10px 12px;margin-bottom:10px;
+}
+.t4-group-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.t4-group-tab{
+  background:transparent;border:1px solid var(--border);border-radius:6px;
+  padding:4px 10px;font-size:.72rem;font-weight:600;color:var(--text-muted);
+  cursor:pointer;display:flex;align-items:center;gap:4px;
+  transition:border-color .12s,color .12s,background .12s;
+}
+.t4-group-tab:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-pale)}
+.t4-group-tab.active{background:var(--blue-pale);font-weight:700}
+.t4-prompt-chips{display:flex;gap:6px;flex-wrap:wrap}
+.t4-prompt-chip{
+  background:#f8faff;border:1px solid var(--border);
+  border-radius:20px;padding:4px 12px;font-size:.72rem;color:var(--text);
+  cursor:pointer;transition:background .12s,border-color .12s,color .12s;white-space:nowrap;
+}
+.t4-prompt-chip:hover{background:var(--blue);border-color:var(--blue);color:#fff}
+/* ── Input row ─────────────────────────────────────────────────── */
+.t4-input-row{display:flex;gap:8px;align-items:center}
+.t4-input-wrap{flex:1}
+.t4-input{
+  width:100%;border:1px solid #93c5fd;border-radius:8px;
+  padding:9px 14px;font-size:.82rem;font-family:'Sora',sans-serif;color:var(--text);
+  outline:none;transition:border-color .15s,box-shadow .15s;
+}
+.t4-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.t4-send-btn{padding:8px 16px !important;border-radius:8px !important}
+.t4-clear-btn{padding:7px 12px !important;border-radius:8px !important}
+/* ── Typing dots ─────────────────────────────────────────────── */
+.t4-dot{
+  display:inline-block;width:5px;height:5px;border-radius:50%;
+  background:var(--blue);animation:t4bounce .8s infinite;margin-right:2px;
+}
+.t4-dot:nth-child(2){animation-delay:.15s}
+.t4-dot:nth-child(3){animation-delay:.3s}
+@keyframes t4bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+</style>`;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  RICH RESPONSE RENDERER
+  //  Converts AI plain-text / markdown into structured HTML.
+  // ══════════════════════════════════════════════════════════════════════
+  function renderRichResponse(raw) {
+    // Safety: if looks like an error/short message, just escape it
+    if (!raw || raw.length < 6) return `<span>${esc(raw)}</span>`;
+
+    let html = '';
+    const lines = raw.split('\n');
+    let i = 0;
+
+    // ── helpers ──────────────────────────────────────────────────────
+    function peek() { return lines[i] || ''; }
+    function consume() { return lines[i++]; }
+
+    // Inline markdown → HTML (bold, italic, inline-code, links)
+    function inlineFormat(txt) {
+      return txt
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        // bold+italic
+        .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
+        // bold
+        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+        .replace(/__(.+?)__/g,'<strong>$1</strong>')
+        // italic
+        .replace(/\*(.+?)\*/g,'<em>$1</em>')
+        .replace(/_(.+?)_/g,'<em>$1</em>')
+        // inline code
+        .replace(/`([^`]+)`/g,'<code>$1</code>')
+        // bare URLs
+        .replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--blue);word-break:break-all">$1</a>');
+    }
+
+    // Detect if a line starts a markdown table (| col | col |)
+    function isTableRow(line) { return /^\s*\|.+\|/.test(line); }
+    function isSeparator(line){ return /^\s*\|[\s\-|:]+\|/.test(line); }
+
+    // ── TABLE PARSER ──────────────────────────────────────────────────
+    function parseTable() {
+      const rows = [];
+      while (i < lines.length && isTableRow(peek())) {
+        const line = consume();
+        if (isSeparator(line)) continue; // skip --- separator row
+        const cells = line.split('|').map(c => c.trim()).filter((c,idx,arr)=>idx>0&&idx<arr.length-1);
+        rows.push(cells);
+      }
+      if (rows.length === 0) return '';
+
+      const headers = rows[0];
+      const body    = rows.slice(1);
+
+      // Detect numeric columns (>50% of body cells look like numbers)
+      function isNumCol(ci) {
+        if (body.length === 0) return false;
+        const numericCount = body.filter(r => /^-?[\d,€$£¥%\s().]+$/.test((r[ci]||'').trim())).length;
+        return numericCount / body.length > 0.5;
+      }
+      // Detect variance columns (header contains "var","diff","delta","change","±")
+      function isVarCol(ci) {
+        return /var|diff|delta|change|±|adv|fav/i.test(headers[ci] || '');
+      }
+
+      let out = '<div class="t4-table-wrap"><table><thead><tr>';
+      headers.forEach(h => { out += `<th>${inlineFormat(h)}</th>`; });
+      out += '</tr></thead><tbody>';
+
+      body.forEach(row => {
+        out += '<tr>';
+        headers.forEach((_, ci) => {
+          const cell = row[ci] !== undefined ? row[ci] : '';
+          let cls = '';
+          if (isNumCol(ci)) cls += ' t4-num';
+          if (isVarCol(ci)) {
+            const num = parseFloat(cell.replace(/[^0-9.\-]/g,''));
+            if (!isNaN(num)) cls += num < 0 ? ' t4-neg' : ' t4-pos';
+          }
+          out += `<td class="${cls.trim()}">${inlineFormat(cell)}</td>`;
+        });
+        out += '</tr>';
+      });
+
+      out += '</tbody></table></div>';
+      return out;
+    }
+
+    // ── DETECT KPI PATTERN ────────────────────────────────────────────
+    // Lines like:  **Total Variance**: €1.2M  or  - **Label**: value
+    // If 2-5 consecutive such lines exist → render as KPI cards
+    function isKpiLine(line) {
+      return /^\*\*[^*]+\*\*\s*[:–-]\s*.+/.test(line.trim()) ||
+             /^-\s*\*\*[^*]+\*\*\s*[:–-]\s*.+/.test(line.trim());
+    }
+
+    function parseKpiBlock(firstLine) {
+      const items = [firstLine];
+      while (i < lines.length && isKpiLine(peek()) && items.length < 5) {
+        items.push(consume());
+      }
+      if (items.length < 2) {
+        // Not enough for a KPI row — just treat as normal line
+        return `<p>${inlineFormat(firstLine.trim())}</p>`;
+      }
+      let out = '<div class="t4-kpi-row">';
+      items.forEach(line => {
+        const m = line.replace(/^-\s*/,'').match(/^\*\*(.+?)\*\*\s*[:–-]\s*(.+)/);
+        if (m) {
+          out += `<div class="t4-kpi-card">
+            <div class="t4-kpi-val">${inlineFormat(m[2].trim())}</div>
+            <div class="t4-kpi-lbl">${inlineFormat(m[1].trim())}</div>
+          </div>`;
+        } else {
+          out += `<div class="t4-kpi-card"><div class="t4-kpi-val">${inlineFormat(line.trim())}</div></div>`;
+        }
+      });
+      out += '</div>';
+      return out;
+    }
+
+    // ── CALLOUT DETECTOR ──────────────────────────────────────────────
+    // Lines starting with ⚠️ ❌ ✅ ℹ️ 💡 → styled callout boxes
+    function getCalloutType(line) {
+      if (/^[⚠️🟡]/.test(line)) return { cls:'t4-callout-warn',   icon:'bi-exclamation-triangle-fill' };
+      if (/^[❌🔴]/.test(line))  return { cls:'t4-callout-danger', icon:'bi-x-circle-fill' };
+      if (/^[✅🟢]/.test(line))  return { cls:'t4-callout-success',icon:'bi-check-circle-fill' };
+      if (/^[ℹ️💡🔵]/.test(line))return { cls:'t4-callout-info',   icon:'bi-info-circle-fill' };
+      return null;
+    }
+
+    // ── NUMBERED ACTION LIST ──────────────────────────────────────────
+    // Consecutive lines like  "1. Do this"  "2. Do that" → styled steps
+    function isOrderedItem(line) { return /^\d+\.\s+/.test(line.trim()); }
+
+    function parseOrderedList() {
+      let out = '<ol class="t4-steps">';
+      while (i < lines.length && isOrderedItem(peek())) {
+        const line = consume().trim().replace(/^\d+\.\s+/,'');
+        out += `<li><span class="t4-step-num">${getStepNum(out)}</span><span>${inlineFormat(line)}</span></li>`;
+      }
+      out += '</ol>';
+      return out;
+    }
+
+    function getStepNum(html) {
+      return (html.match(/<li>/g)||[]).length + 1;
+    }
+
+    // ── UNORDERED LIST ────────────────────────────────────────────────
+    function isUnorderedItem(line) { return /^[-*•]\s+/.test(line.trim()); }
+
+    function parseUnorderedList() {
+      let out = '<ul>';
+      while (i < lines.length && isUnorderedItem(peek())) {
+        const line = consume().trim().replace(/^[-*•]\s+/,'');
+        out += `<li>${inlineFormat(line)}</li>`;
+      }
+      out += '</ul>';
+      return out;
+    }
+
+    // ── MAIN PARSE LOOP ───────────────────────────────────────────────
+    while (i < lines.length) {
+      const line = consume();
+      const trimmed = line.trim();
+
+      // blank
+      if (!trimmed) { html += ''; continue; }
+
+      // headings
+      if (/^#{1}\s+/.test(trimmed)) { html += `<h1>${inlineFormat(trimmed.replace(/^#+\s+/,''))}</h1>`; continue; }
+      if (/^#{2}\s+/.test(trimmed)) { html += `<h2>${inlineFormat(trimmed.replace(/^#+\s+/,''))}</h2>`; continue; }
+      if (/^#{3,}\s+/.test(trimmed)){ html += `<h3>${inlineFormat(trimmed.replace(/^#+\s+/,''))}</h3>`; continue; }
+
+      // horizontal rule
+      if (/^[-*_]{3,}$/.test(trimmed)) { html += '<hr>'; continue; }
+
+      // blockquote
+      if (/^>\s*/.test(trimmed)) { html += `<blockquote>${inlineFormat(trimmed.replace(/^>\s*/,''))}</blockquote>`; continue; }
+
+      // markdown table
+      if (isTableRow(trimmed)) {
+        i--; // back up so parseTable reads this line
+        html += parseTable();
+        continue;
+      }
+
+      // callout (emoji-prefixed lines)
+      const callout = getCalloutType(trimmed);
+      if (callout) {
+        html += `<div class="t4-callout ${callout.cls}"><i class="bi ${callout.icon}"></i><span>${inlineFormat(trimmed)}</span></div>`;
+        continue;
+      }
+
+      // ordered list
+      if (isOrderedItem(trimmed)) {
+        i--; // back up
+        html += parseOrderedList();
+        continue;
+      }
+
+      // unordered list
+      if (isUnorderedItem(trimmed)) {
+        i--; // back up
+        html += parseUnorderedList();
+        continue;
+      }
+
+      // KPI pattern (bold key: value)
+      if (isKpiLine(trimmed)) {
+        i--; // back up
+        html += parseKpiBlock(consume());
+        continue;
+      }
+
+      // default paragraph
+      html += `<p>${inlineFormat(trimmed)}</p>`;
+    }
+
+    return `<div class="t4-rich">${html}</div>`;
+  }
+
+  // ── RENDER PERSONA BANNER ─────────────────────────────────────────────
+  function renderPersonaBanner() {
+    const persona = getCurrentPersona();
+    const banner  = document.getElementById('t4-persona-banner');
+    if (!banner) return;
+
+    banner.style.borderColor = persona.color;
+    banner.style.background  = persona.color + '10';
+
+    document.getElementById('t4-banner-icon').style.color = persona.color;
+    document.getElementById('t4-banner-name').textContent = persona.label;
+    document.getElementById('t4-banner-name').style.color = persona.color;
+
+    const hints = {
+      CFO:              "— prompts tuned to strategic, high-level P&L questions",
+      VP_FINANCE:       "— prompts tuned to budget stewardship and cost control",
+      BUSINESS_PARTNER: "— prompts tuned to operational root-cause and team actions",
+      BOARD:            "— prompts tuned to board-level narrative and governance",
+      AUDITOR:          "— prompts tuned to materiality, controls and JSOX compliance",
+      FP_A:             "— prompts tuned to detailed driver analysis and modelling",
+    };
+    const pid = window.__va_persona || 'CFO';
+    document.getElementById('t4-banner-hint').textContent = hints[pid] || "";
+  }
+
+  // ── RENDER PROMPT GROUPS ──────────────────────────────────────────────
+  function renderPromptGroups() {
+    const persona = getCurrentPersona();
+    const groups  = persona.groups;
+    activeGroup   = 0;
+
+    const tabsEl = document.getElementById('t4-group-tabs');
+    if (!tabsEl) return;
+    tabsEl.innerHTML = groups.map((g, i) => `
+      <button class="t4-group-tab ${i===0?'active':''}" data-gi="${i}"
+        style="${i===0 ? `border-color:${g.color};color:${g.color};background:${g.color}18` : ''}">
+        <i class="bi ${g.icon}"></i> ${g.label}
+      </button>`).join('');
+
+    renderChips(groups[0]);
+
+    tabsEl.addEventListener('click', e => {
+      const btn = e.target.closest('.t4-group-tab');
+      if (!btn) return;
+      activeGroup = parseInt(btn.dataset.gi, 10);
+      const g = groups[activeGroup];
+      tabsEl.querySelectorAll('.t4-group-tab').forEach((b, i) => {
+        const isMe = i === activeGroup;
+        b.classList.toggle('active', isMe);
+        b.style.borderColor = isMe ? g.color : '';
+        b.style.color       = isMe ? g.color : '';
+        b.style.background  = isMe ? g.color + '18' : '';
+      });
+      renderChips(g);
+    });
+  }
+
+  function renderChips(group) {
+    const el = document.getElementById('t4-prompt-chips');
+    if (!el) return;
+    el.innerHTML = group.prompts.map(p =>
+      `<button class="t4-prompt-chip" data-prompt="${p.replace(/"/g,'&quot;')}">${p}</button>`
+    ).join('');
+    el.querySelectorAll('.t4-prompt-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('t4-input').value = chip.dataset.prompt;
+        document.getElementById('t4-input').focus();
+        handleSend();
+      });
+    });
+  }
+
+  // ── INIT ────────────────────────────────────────────────────────────────
+  function init() {
+    if (initialised) return;
+    initialised = true;
+    document.getElementById('tab4-content').innerHTML = buildHTML();
+    bindEvents();
+    renderPersonaBanner();
+    renderPromptGroups();
+    checkDataStatus();
+  }
+
+  function refresh() {
+    if (!initialised) { init(); return; }
+    renderPersonaBanner();
+    renderPromptGroups();
+    checkDataStatus();
+  }
+
+  async function checkDataStatus() {
+    try {
+      await vaGet('/api/tab2/filters');
+      const el = document.getElementById('t4-source-status');
+      if (el) { el.className = 't4-source-status ok'; el.innerHTML = '<i class="bi bi-check-circle-fill"></i><span>Data loaded from session — ready to chat!</span>'; }
+    } catch (_) {}
+  }
+
+  function bindEvents() {
+    document.getElementById('t4-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    });
+    document.getElementById('t4-btn-send').addEventListener('click', handleSend);
+    document.getElementById('t4-btn-clear').addEventListener('click', handleClear);
+    document.getElementById('t4-banner-change').addEventListener('click', e => {
+      e.preventDefault();
+      const tab3btn = document.querySelector('.va-tab[data-tab="tab3"]');
+      if (tab3btn) tab3btn.click();
+    });
+  }
+
+  // ── SEND ─────────────────────────────────────────────────────────────
+  async function handleSend() {
+    const input = document.getElementById('t4-input');
+    const q = input.value.trim();
+    if (!q) return;
+
+    vaAlertClear('t4-alert');
+    appendMsg('user', q);
+    input.value = '';
+
+    const typingId = appendTyping();
+    setLoading(true);
+
+    try {
+      const data = await vaPost('/api/tab4/ask', { question: q });
+      removeMsg(typingId);
+      // ── Use rich renderer for assistant replies ──
+      appendRichMsg(data.answer || '(No answer returned)');
+    } catch (e) {
+      removeMsg(typingId);
+      appendRichMsg(
+        e.message.includes('404')
+          ? '⚠️ No data in session. Run Tab 1 Mapping or Tab 2 Variance Analysis first, then return here.'
+          : `❌ Error: ${e.message}`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── CLEAR ────────────────────────────────────────────────────────────
+  async function handleClear() {
+    try { await fetch('/api/tab4/clear', { method: 'DELETE' }); } catch(_) {}
+    const win = document.getElementById('t4-chat-window');
+    win.innerHTML = `
+      <div class="t4-msg t4-assistant">
+        <div class="t4-avatar"><i class="bi bi-robot"></i></div>
+        <div class="t4-bubble">Chat cleared. Ask me anything about your loaded data!</div>
+      </div>`;
+  }
+
+  // ── MESSAGE HELPERS ──────────────────────────────────────────────────
+  let _mid = 0;
+
+  function appendMsg(role, text) {
+    const id  = `t4m${_mid++}`;
+    const win = document.getElementById('t4-chat-window');
+    const icon = role === 'user' ? 'bi-person-fill' : 'bi-robot';
+    const div = document.createElement('div');
+    div.id = id; div.className = `t4-msg t4-${role}`;
+    div.innerHTML = `<div class="t4-avatar"><i class="bi ${icon}"></i></div>
+      <div class="t4-bubble">${esc(text)}</div>`;
+    win.appendChild(div);
+    win.scrollTop = win.scrollHeight;
+    return id;
+  }
+
+  // ── NEW: Rich assistant message (uses renderer) ───────────────────────
+  function appendRichMsg(rawText) {
+    const id  = `t4m${_mid++}`;
+    const win = document.getElementById('t4-chat-window');
+    const div = document.createElement('div');
+    div.id = id; div.className = 't4-msg t4-assistant';
+    div.innerHTML = `
+      <div class="t4-avatar"><i class="bi bi-robot"></i></div>
+      <div class="t4-bubble" style="max-width:85%;padding:13px 16px">
+        ${renderRichResponse(rawText)}
+      </div>`;
+    win.appendChild(div);
+    win.scrollTop = win.scrollHeight;
+    return id;
+  }
+
+  function appendTyping() {
+    const id  = `t4m${_mid++}`;
+    const win = document.getElementById('t4-chat-window');
+    const div = document.createElement('div');
+    div.id = id; div.className = 't4-msg t4-assistant t4-typing';
+    div.innerHTML = `<div class="t4-avatar"><i class="bi bi-robot"></i></div>
+      <div class="t4-bubble"><span class="t4-dot"></span><span class="t4-dot"></span><span class="t4-dot"></span></div>`;
+    win.appendChild(div);
+    win.scrollTop = win.scrollHeight;
+    return id;
+  }
+
+  function removeMsg(id) { const el = document.getElementById(id); if (el) el.remove(); }
+
+  function setLoading(on) {
+    document.getElementById('t4-btn-send').disabled = on;
+    document.getElementById('t4-input').disabled    = on;
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\n/g,'<br>');
+  }
+
+  window.addEventListener('va:tabchange', e => {
+    if (e.detail === 'tab4') refresh();
+  });
+
+})();
