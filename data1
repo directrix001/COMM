@@ -1,0 +1,48 @@
+**Drop both files into their folders and restart uvicorn. No other changes needed.**
+
+---
+
+## What changed and where — annotated
+
+### `routers/tab4_chat.py`
+
+| Function | Source | What it does |
+|---|---|---|
+| `_build_system_prompt()` | **Ported from uploaded script** `build_system_prompt()` | A/B/C answer rules — query df, use literal numbers, follow-ups |
+| `_build_agent(df)` | **Ported from** `build_agent()` | `agent_type="tool-calling"`, `number_of_head_rows=10`, `include_df_in_prompt=True`, `max_iterations=20`, `prefix=system_prompt` |
+| `_run_agent_with_memory()` | **Ported from** `ask()` | Calls `_build_input_with_history()` then invokes agent in thread pool |
+| `_build_input_with_history()` | **Ported from** `_build_input()` | Prepends `"Conversation so far:\n…\nCurrent question: …"` |
+| `_get_history()` / `_save_turn()` | **Ported from** `get_history()` / `save_turn()` | Per `(sid, data_source)` key so Tab1/Tab2 histories stay separate |
+| `_load_df(sid, data_source)` | **NEW** | `"tab1"` → `final_db_bytes`, `"tab2"` → `leaf_df_bytes` → `master_db_bytes` |
+| `GET /api/tab4/status` | **NEW** | Returns `{tab1_available, tab2_available}` for radio button UI |
+| `POST /api/tab4/ask` | **UPDATED** | Now reads `body.data_source`, routes to correct df, sends full history |
+
+**Where the DataFrames are:**
+```python
+# Tab 1 DataFrame (final_db_bytes):
+# Entity_desc, Region, Market, OH/LC, CostCat description,
+# Division_Desc, Function_Desc, Scenario, MTD, YTD, 1-Apr … 12-Mar
+
+# Tab 2 DataFrame (leaf_df_bytes — preferred):
+# group_fields (OH/LC, Division_Desc…), <Scenario A>, <Scenario B>,
+# Variance (M€), Variance %
+
+# Tab 2 fallback (master_db_bytes):
+# Full pre-pivot master with Scenario column
+```
+
+---
+
+### `static/js/tab4.js`
+
+| Change | Location in file |
+|---|---|
+| `DATA_SOURCES` object — describes each df | Top of IIFE |
+| Two radio buttons HTML | `buildHTML()` — marked with `═══ DATA SOURCE RADIO BUTTONS (NEW)` comment |
+| `.t4-source-radio-wrap` CSS | Inline `<style>` block |
+| `checkStatus()` — `GET /api/tab4/status` | `init()` and `refresh()` |
+| `updateRadioStatus()` — ✅ Ready / ⚠️ Not loaded | Called by `checkStatus()` |
+| `renderActiveBanner()` — blue/green banner | Called on source switch |
+| `bindRadioButtons()` — click handler | `bindEvents()` |
+| `data_source: currentSource` — sent on every ask | `handleSend()` |
+| `clearChatWindow()` + context switch message | Radio click handler |
