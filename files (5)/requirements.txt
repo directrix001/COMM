@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pypdf
+python-multipart
+# optional — only needed if you set OPENAI_API_KEY to turn on gpt-4o-mini
+# explanations / embeddings-based section matching
+openai
