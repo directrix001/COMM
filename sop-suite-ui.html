@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SOPflow — SOP Suite</title>
+<style>
+  :root{
+    --navy-950:#0B1526;
+    --navy-800:#16233D;
+    --navy-700:#1E2E4D;
+    --teal-500:#17A398;
+    --teal-600:#128C82;
+    --teal-100:#DFF5F2;
+    --bg:#F5F7FA;
+    --surface:#FFFFFF;
+    --border:#E2E8F0;
+    --text-900:#10182B;
+    --text-600:#5B6472;
+    --text-400:#94A0AF;
+    --red-500:#D14848;
+    --red-100:#FBE7E7;
+    --green-600:#2E9E6B;
+    --green-100:#E4F6EE;
+    --amber-500:#C98A1F;
+    --amber-100:#FBF0DC;
+    --radius:8px;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--text-900);
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{ display:flex; min-height:100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:216px;
+    background:var(--navy-950);
+    color:#fff;
+    flex-shrink:0;
+    display:flex;
+    flex-direction:column;
+    padding:20px 12px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:8px;
+    padding:6px 10px 22px 10px;
+  }
+  .brand-mark{
+    width:26px;height:26px;border-radius:6px;
+    background:linear-gradient(135deg,var(--teal-500),#0D6E66);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:13px;color:#00201D;
+  }
+  .brand-name{ font-weight:600; font-size:15px; letter-spacing:.2px; }
+  .nav{ display:flex; flex-direction:column; gap:2px; margin-top:6px; }
+  .nav-item{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px; border-radius:7px;
+    color:#B7C1D6; font-size:13.5px; font-weight:500;
+    cursor:pointer; border:none; background:none; text-align:left;
+    width:100%;
+    transition:background .12s ease, color .12s ease;
+  }
+  .nav-item svg{ flex-shrink:0; opacity:.85; }
+  .nav-item:hover{ background:var(--navy-800); color:#fff; }
+  .nav-item.active{ background:var(--navy-700); color:#fff; box-shadow:inset 2px 0 0 var(--teal-500); }
+  .nav-caption{ font-size:11px; color:var(--text-400); padding:2px 12px 10px 12px; line-height:1.5; }
+
+  .sidebar-foot{
+    margin-top:auto; padding:12px 10px; border-top:1px solid var(--navy-800);
+    font-size:11px; color:var(--text-400); line-height:1.5;
+  }
+  .badge-model{
+    display:inline-flex; align-items:center; gap:5px;
+    background:var(--navy-800); color:var(--teal-500);
+    padding:4px 8px; border-radius:20px; font-size:10.5px; font-weight:600;
+    margin-top:8px; font-family:var(--mono);
+  }
+  .dot{ width:6px;height:6px;border-radius:50%; background:var(--teal-500); }
+
+  /* ---------- Main ---------- */
+  .main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 28px; border-bottom:1px solid var(--border);
+    background:var(--surface);
+  }
+  .topbar h1{ font-size:18px; margin:0; font-weight:650; }
+  .topbar p{ margin:2px 0 0 0; font-size:12.5px; color:var(--text-600); }
+  .actions{ display:flex; gap:10px; }
+  .btn{
+    font-family:var(--sans); font-size:13px; font-weight:600;
+    padding:8px 14px; border-radius:7px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text-900); cursor:pointer;
+  }
+  .btn:hover{ border-color:var(--text-400); }
+  .btn-primary{ background:var(--navy-950); color:#fff; border-color:var(--navy-950); }
+  .btn-primary:hover{ background:var(--navy-800); }
+  .btn-teal{ background:var(--teal-500); color:#fff; border-color:var(--teal-500); }
+  .btn-teal:hover{ background:var(--teal-600); }
+  .btn-ghost{ border-color:transparent; color:var(--text-600); }
+
+  .view{ padding:24px 28px; overflow:auto; }
+  .hidden{ display:none; }
+
+  .panel{
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:18px;
+  }
+  .panel + .panel{ margin-top:16px; }
+  .panel h3{ margin:0 0 4px 0; font-size:13.5px; font-weight:650; }
+  .panel .sub{ margin:0 0 14px 0; font-size:12px; color:var(--text-600); }
+
+  .grid-2{ display:grid; grid-template-columns:1.05fr 1fr; gap:18px; align-items:start; }
+
+  label{ display:block; font-size:12px; font-weight:600; color:var(--text-600); margin-bottom:5px; }
+  input[type=text], select, textarea{
+    width:100%; font-family:var(--sans); font-size:13.5px;
+    padding:9px 10px; border:1px solid var(--border); border-radius:6px;
+    background:#FBFCFE; color:var(--text-900); margin-bottom:14px;
+  }
+  textarea{ resize:vertical; min-height:64px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .step-card{
+    border:1px solid var(--border); border-radius:7px; padding:12px 12px 12px 14px;
+    margin-bottom:10px; background:#FBFCFE; position:relative;
+    border-left:3px solid var(--teal-500);
+  }
+  .step-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .step-num{ font-family:var(--mono); font-size:11px; color:var(--teal-600); font-weight:700; }
+  .step-tools{ display:flex; gap:6px; }
+  .icon-btn{ background:none; border:none; color:var(--text-400); cursor:pointer; padding:2px; }
+  .icon-btn:hover{ color:var(--text-600); }
+  .step-title{ font-size:13.5px; font-weight:600; margin-bottom:3px; }
+  .step-body{ font-size:12.5px; color:var(--text-600); line-height:1.5; }
+
+  .add-step{
+    width:100%; padding:10px; border:1px dashed var(--border); border-radius:7px;
+    background:none; color:var(--text-600); font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .add-step:hover{ border-color:var(--teal-500); color:var(--teal-600); }
+
+  .preview-doc{
+    background:#FBFCFE; border:1px solid var(--border); border-radius:7px;
+    padding:20px; font-size:13px; line-height:1.6; color:var(--text-900);
+  }
+  .preview-doc h4{ margin:0 0 2px 0; font-size:15px; }
+  .preview-doc .meta{ font-size:11.5px; color:var(--text-400); margin-bottom:14px; font-family:var(--mono); }
+  .preview-doc ol{ padding-left:18px; margin:0; }
+  .preview-doc li{ margin-bottom:8px; }
+
+  /* ---------- Table (Manager) ---------- */
+  .table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .table th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px;
+    color:var(--text-400); font-weight:650; padding:8px 10px; border-bottom:1px solid var(--border);
+  }
+  .table td{ padding:12px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .table tr:last-child td{ border-bottom:none; }
+  .table tr:hover td{ background:#FAFBFD; }
+  .sop-title{ font-weight:600; font-size:13.5px; }
+  .sop-sub{ font-size:11.5px; color:var(--text-400); }
+
+  .chip{
+    display:inline-flex; align-items:center; gap:5px;
+    padding:3px 9px; border-radius:20px; font-size:11px; font-weight:650;
+  }
+  .chip-pending{ background:var(--amber-100); color:#8A5F13; }
+  .chip-approved{ background:var(--green-100); color:#1F6E4B; }
+  .chip-draft{ background:#EEF0F4; color:var(--text-600); }
+  .chip-rejected{ background:var(--red-100); color:#9A2E2E; }
+  .chip::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+  .tab-strip{ display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--border); }
+  .tab-strip button{
+    background:none; border:none; padding:9px 4px; margin-right:18px;
+    font-size:13px; font-weight:600; color:var(--text-600); cursor:pointer;
+    border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  .tab-strip button.active{ color:var(--navy-950); border-bottom-color:var(--teal-500); }
+
+  .review-row{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--amber-100); border:1px solid #EBD8A8; border-radius:7px;
+    padding:10px 14px; font-size:12.5px; color:#7A5610; margin-bottom:16px;
+  }
+
+  /* ---------- Anomaly Detector ---------- */
+  .ad-toolbar{
+    display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap;
+  }
+  .select-inline{
+    font-family:var(--sans); font-size:12.5px; padding:7px 10px;
+    border:1px solid var(--border); border-radius:6px; background:var(--surface);
+  }
+  .vs{ color:var(--text-400); font-size:12px; font-weight:600; }
+
+  .redline{
+    font-family:var(--mono); font-size:12.5px; line-height:1.9;
+    background:#FBFCFE; border:1px solid var(--border); border-radius:7px; padding:18px 20px;
+    white-space:pre-wrap;
+  }
+  .add-line{ background:var(--green-100); color:#1F6E4B; text-decoration:none; display:block; padding:2px 4px; border-radius:3px; }
+  .add-line::before{ content:"+ "; font-weight:700; }
+  .del-line{ background:var(--red-100); color:#9A2E2E; text-decoration:line-through; display:block; padding:2px 4px; border-radius:3px; opacity:.85; }
+  .del-line::before{ content:"− "; font-weight:700; text-decoration:none; display:inline; }
+  .ctx-line{ color:var(--text-600); display:block; padding:2px 4px; }
+
+  .ad-columns{ display:grid; grid-template-columns:1.3fr 1fr; gap:18px; align-items:start; margin-top:16px; }
+
+  .note-card{
+    border:1px solid var(--border); border-left:3px solid var(--navy-700);
+    border-radius:7px; padding:12px 14px; margin-bottom:12px; background:var(--surface);
+  }
+  .note-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .note-title{ font-size:12.5px; font-weight:650; }
+  .sev{ font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; }
+  .sev-critical{ background:var(--red-100); color:#9A2E2E; }
+  .sev-moderate{ background:var(--amber-100); color:#8A5F13; }
+  .sev-minor{ background:#EEF0F4; color:var(--text-600); }
+  .note-body{ font-size:12.5px; color:var(--text-600); line-height:1.55; }
+  .note-src{
+    margin-top:8px; font-size:11px; color:var(--text-400); font-family:var(--mono);
+    display:flex; align-items:center; gap:5px;
+  }
+
+  .rag-banner{
+    display:flex; gap:10px; align-items:flex-start;
+    background:var(--navy-950); color:#EAF0FB; border-radius:8px; padding:14px 16px; margin-bottom:16px;
+  }
+  .rag-banner h4{ margin:0 0 3px 0; font-size:13px; }
+  .rag-banner p{ margin:0; font-size:12px; color:#AEB9CE; line-height:1.5; }
+  .rag-icon{
+    width:28px;height:28px;border-radius:6px;flex-shrink:0;
+    background:var(--teal-500); display:flex; align-items:center; justify-content:center; color:#00201D; font-weight:700; font-size:12px;
+  }
+
+  /* ---------- Upload & library ---------- */
+  .upload-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .upload-slot{
+    border:1.5px dashed var(--border); border-radius:8px; padding:16px;
+    background:#FBFCFE; text-align:center; position:relative;
+  }
+  .upload-slot.filled{ border-style:solid; border-color:var(--teal-500); background:var(--teal-100); text-align:left; }
+  .upload-slot .slot-label{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--text-400); margin-bottom:8px; display:block; }
+  .upload-slot.filled .slot-label{ color:var(--teal-600); }
+  .drop-icon{ width:30px; height:30px; margin:0 auto 8px auto; color:var(--text-400); }
+  .upload-slot p.hint{ margin:0; font-size:12px; color:var(--text-600); }
+  .upload-slot p.small{ margin:4px 0 0 0; font-size:11px; color:var(--text-400); }
+  .upload-slot input[type=file]{ display:none; }
+  .file-chip{
+    display:flex; align-items:center; gap:10px; text-align:left;
+  }
+  .file-chip .fico{
+    width:34px; height:34px; border-radius:6px; background:var(--teal-500); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0;
+  }
+  .file-chip .fname{ font-size:12.5px; font-weight:650; color:var(--text-900); }
+  .file-chip .fmeta{ font-size:11px; color:var(--text-600); font-family:var(--mono); }
+  .file-swap{ margin-top:10px; }
+  .file-swap button{ font-size:11px; }
+
+  .lib-list{ margin-top:14px; }
+  .lib-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:8px 4px; font-size:12px; border-top:1px solid var(--border);
+  }
+  .lib-row:first-child{ border-top:none; }
+  .lib-row .lname{ color:var(--text-600); }
+  .lib-row .ltag{ font-family:var(--mono); font-size:10.5px; color:var(--text-400); }
+
+  .processing-row{
+    display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--text-600);
+    padding:12px 4px; margin-top:14px;
+  }
+  .spinner{
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid var(--border); border-top-color:var(--teal-500);
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- Change type + auditor marking ---------- */
+  .tag-row{ display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .type-tag{
+    font-size:10.5px; font-weight:650; padding:2px 8px; border-radius:5px;
+    background:#EEF0F4; color:var(--text-600); display:inline-flex; align-items:center; gap:4px;
+  }
+  .type-tag.t-numeric{ background:#FBEFE0; color:#8A5313; }
+  .type-tag.t-process{ background:#E4ECFB; color:#2C4C9A; }
+  .type-tag.t-routing{ background:#F1E7FB; color:#6B3B9A; }
+  .type-tag.t-wording{ background:#EEF0F4; color:var(--text-600); }
+
+  .auditor-box{
+    margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);
+  }
+  .auditor-label{ font-size:10.5px; font-weight:700; color:var(--text-400); text-transform:uppercase; letter-spacing:.3px; margin-bottom:6px; }
+  .auditor-btns{ display:flex; gap:6px; flex-wrap:wrap; }
+  .mark-btn{
+    font-family:var(--sans); font-size:11px; font-weight:650; cursor:pointer;
+    padding:5px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text-600);
+  }
+  .mark-btn:hover{ border-color:var(--text-400); }
+  .mark-btn.mb-ack.is-active{ background:var(--green-100); border-color:#9FD9BE; color:#1F6E4B; }
+  .mark-btn.mb-flag.is-active{ background:var(--red-100); border-color:#EFB4B4; color:#9A2E2E; }
+  .mark-btn.mb-note.is-active{ background:var(--teal-100); border-color:#8FD6CE; color:var(--teal-600); }
+  .auditor-note{
+    display:none; width:100%; margin-top:8px; font-size:12px; padding:7px 9px;
+    border:1px solid var(--border); border-radius:6px; font-family:var(--sans); min-height:44px;
+  }
+  .auditor-note.show{ display:block; }
+  .mark-status{
+    font-size:11px; color:var(--text-400); margin-top:6px; font-style:italic;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">SF</div>
+      <div class="brand-name">SOPflow</div>
+    </div>
+    <div class="nav">
+      <button class="nav-item active" data-tab="builder">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        SOP Builder
+      </button>
+      <button class="nav-item" data-tab="manager">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 4v6"/></svg>
+        SOP Manager
+      </button>
+      <button class="nav-item" data-tab="anomaly">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4v6c0 5-3.8 8.5-9 10-5.2-1.5-9-5-9-10V6l9-4z"/><path d="M12 8v5M12 16.5v.01"/></svg>
+        Anomaly Detector
+      </button>
+    </div>
+    <div class="sidebar-foot">
+      Backend for the Anomaly Detector
+      <div class="badge-model"><span class="dot"></span>embeddings + gpt-4o-mini</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- ===== BUILDER ===== -->
+    <div class="view" id="view-builder">
+      <div class="topbar" style="margin:-24px -28px 20px -28px;">
+        <div>
+          <h1>SOP Builder</h1>
+          <p>Draft a new procedure — add steps, then send it for review.</p>
+        </div>
+        <div class="actions">
+          <button class="btn">Save draft</button>
+          <button class="btn btn-teal">Submit for approval</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <div class="panel">
+            <h3>Details</h3>
+            <p class="sub">Basic information used to file and route this SOP.</p>
+            <label>Title</label>
+            <input type="text" value="Month-End Variance Reconciliation">
+            <div class="field-row">
+              <div>
+                <label>Department</label>
+                <select><option>FP&amp;A</option><option>Finance Ops</option><option>Controllership</option></select>
+              </div>
+              <div>
+                <label>Owner</label>
+                <input type="text" value="Kshitiz">
+              </div>
+            </div>
+            <label>Purpose</label>
+            <textarea>Defines the steps for reconciling monthly variance reports before submission to regional finance leads.</textarea>
+          </div>
+
+          <div class="panel">
+            <h3>Steps</h3>
+            <p class="sub">Each step becomes one numbered instruction in the published SOP.</p>
+
+            <div class="step-card">
+              <div class="step-head">
+                <span class="step-num">STEP 01</span>
+                <div class="step-tools">
+                  <button class="icon-btn" title="Move up">↑</button>
+                  <button class="icon-btn" title="Move down">↓</button>
+                  <button class="icon-btn" title="Delete">✕</button>
+                </div>
+              </div>
+              <div class="step-title">Pull the raw variance extract</div>
+              <div class="step-body">Export the current-month actuals vs. budget file from the reporting tool before 9 AM local time.</div>
+            </div>
+
+            <div class="step-card">
+              <div class="step-head">
+                <span class="step-num">STEP 02</span>
+                <div class="step-tools">
+                  <button class="icon-btn" title="Move up">↑</button>
+                  <button class="icon-btn" title="Move down">↓</button>
+                  <button class="icon-btn" title="Delete">✕</button>
+                </div>
+              </div>
+              <div class="step-title">Flag variances above threshold</div>
+              <div class="step-body">Highlight any line item where variance exceeds 8% or $50K, whichever is lower.</div>
+            </div>
+
+            <div class="step-card">
+              <div class="step-head">
+                <span class="step-num">STEP 03</span>
+                <div class="step-tools">
+                  <button class="icon-btn" title="Move up">↑</button>
+                  <button class="icon-btn" title="Move down">↓</button>
+                  <button class="icon-btn" title="Delete">✕</button>
+                </div>
+              </div>
+              <div class="step-title">Route to regional lead for sign-off</div>
+              <div class="step-body">Send the flagged summary for approval before it is included in the consolidated report.</div>
+            </div>
+
+            <button class="add-step">+ Add step</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel" style="position:sticky; top:24px;">
+            <h3>Live preview</h3>
+            <p class="sub">What reviewers and readers will see once published.</p>
+            <div class="preview-doc">
+              <h4>Month-End Variance Reconciliation</h4>
+              <div class="meta">FP&amp;A · Owner: Kshitiz · Draft v0.1</div>
+              <ol>
+                <li>Pull the raw variance extract before 9 AM local time.</li>
+                <li>Flag variances above 8% or $50K, whichever is lower.</li>
+                <li>Route the flagged summary to the regional lead for sign-off.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MANAGER ===== -->
+    <div class="view hidden" id="view-manager">
+      <div class="topbar" style="margin:-24px -28px 20px -28px;">
+        <div>
+          <h1>SOP Manager</h1>
+          <p>Track every SOP's status and clear the approval queue.</p>
+        </div>
+        <div class="actions">
+          <button class="btn">Export list</button>
+          <button class="btn btn-primary">+ New SOP</button>
+        </div>
+      </div>
+
+      <div class="review-row">
+        <span><strong>3 SOPs</strong> have edits waiting on your review before they can go live.</span>
+        <button class="btn btn-teal" style="padding:6px 12px; font-size:12px;">Review now</button>
+      </div>
+
+      <div class="tab-strip">
+        <button class="active">All (12)</button>
+        <button>Pending approval (3)</button>
+        <button>Approved (8)</button>
+        <button>Rejected (1)</button>
+      </div>
+
+      <div class="panel" style="padding:0;">
+        <table class="table">
+          <thead>
+            <tr><th>SOP</th><th>Department</th><th>Status</th><th>Last edited</th><th>Reviewer</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="sop-title">Month-End Variance Reconciliation</div><div class="sop-sub">v2.3 → v2.4 pending</div></td>
+              <td>FP&amp;A</td>
+              <td><span class="chip chip-pending">Pending approval</span></td>
+              <td>2 days ago</td>
+              <td>Rebecca</td>
+              <td><button class="btn btn-ghost" style="padding:5px 10px;">Review diff →</button></td>
+            </tr>
+            <tr>
+              <td><div class="sop-title">Vendor Invoice Exception Handling</div><div class="sop-sub">v1.8 → v1.9 pending</div></td>
+              <td>Finance Ops</td>
+              <td><span class="chip chip-pending">Pending approval</span></td>
+              <td>3 days ago</td>
+              <td>Unassigned</td>
+              <td><button class="btn btn-ghost" style="padding:5px 10px;">Review diff →</button></td>
+            </tr>
+            <tr>
+              <td><div class="sop-title">UiPath Bot Failure Escalation</div><div class="sop-sub">v3.0 → v3.1 pending</div></td>
+              <td>Automation</td>
+              <td><span class="chip chip-pending">Pending approval</span></td>
+              <td>5 hours ago</td>
+              <td>Kshitiz</td>
+              <td><button class="btn btn-ghost" style="padding:5px 10px;">Review diff →</button></td>
+            </tr>
+            <tr>
+              <td><div class="sop-title">Nissan Weekly FP&amp;A Refresh</div><div class="sop-sub">v4.1 · current</div></td>
+              <td>FP&amp;A</td>
+              <td><span class="chip chip-approved">Approved</span></td>
+              <td>1 week ago</td>
+              <td>Rebecca</td>
+              <td><button class="btn btn-ghost" style="padding:5px 10px;">View →</button></td>
+            </tr>
+            <tr>
+              <td><div class="sop-title">New Hire System Access Request</div><div class="sop-sub">v1.0 · draft</div></td>
+              <td>IT Ops</td>
+              <td><span class="chip chip-draft">Draft</span></td>
+              <td>2 weeks ago</td>
+              <td>—</td>
+              <td><button class="btn btn-ghost" style="padding:5px 10px;">Edit →</button></td>
+            </tr>
+            <tr>
+              <td><div class="sop-title">Quarterly Budget Reforecast</div><div class="sop-sub">v2.0 rejected</div></td>
+              <td>FP&amp;A</td>
+              <td><span class="chip chip-rejected">Rejected</span></td>
+              <td>3 weeks ago</td>
+              <td>Rebecca</td>
+              <td><button class="btn btn-ghost" style="padding:5px 10px;">View notes →</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== ANOMALY DETECTOR ===== -->
+    <div class="view hidden" id="view-anomaly">
+      <div class="topbar" style="margin:-24px -28px 20px -28px;">
+        <div>
+          <h1>Anomaly Detector</h1>
+          <p>Compare two SOP versions and get a plain-language explanation of what changed.</p>
+        </div>
+        <div class="actions">
+          <button class="btn">Export report</button>
+          <button class="btn btn-teal">Flag for review</button>
+        </div>
+      </div>
+
+      <div class="rag-banner">
+        <div class="rag-icon">AI</div>
+        <div>
+          <h4>How this will work</h4>
+          <p>Each SOP version is embedded and stored. When a new version is uploaded, the tool retrieves the matching prior sections (RAG), diffs them, and asks gpt-4o-mini to summarize what materially changed, why it matters, and how risky it is — instead of a raw line-by-line diff. Everything below is a mock of that output; the retrieval + generation pipeline plugs in later.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Upload &amp; compare</h3>
+        <p class="sub">Upload a SOP PDF to store it as the baseline. Upload the next version of the same SOP and it's automatically compared against what's stored.</p>
+
+        <div class="upload-grid">
+          <div class="upload-slot filled" id="slot-baseline">
+            <span class="slot-label">Stored baseline</span>
+            <div class="file-chip">
+              <div class="fico">PDF</div>
+              <div>
+                <div class="fname">Month-End Variance Reconciliation — v2.3</div>
+                <div class="fmeta">stored 14 Jul · sop_variance_recon_v2.3.pdf</div>
+              </div>
+            </div>
+            <div class="file-swap">
+              <button class="btn btn-ghost" onclick="document.getElementById('file-baseline').click()">Replace baseline</button>
+              <input type="file" id="file-baseline" accept="application/pdf">
+            </div>
+            <div class="lib-list">
+              <div class="lib-row"><span class="lname">Vendor Invoice Exception Handling — v1.8</span><span class="ltag">stored 09 Jul</span></div>
+              <div class="lib-row"><span class="lname">UiPath Bot Failure Escalation — v3.0</span><span class="ltag">stored 02 Jul</span></div>
+            </div>
+          </div>
+
+          <div class="upload-slot" id="slot-new">
+            <span class="slot-label">New upload</span>
+            <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+            <p class="hint">Drag a SOP PDF here, or click to browse</p>
+            <p class="small">It's matched to a stored SOP by title — if none matches, it's saved as a new baseline instead.</p>
+            <button class="btn" style="margin-top:12px;" onclick="document.getElementById('file-new').click()">Upload PDF</button>
+            <input type="file" id="file-new" accept="application/pdf">
+          </div>
+        </div>
+
+        <div class="processing-row hidden" id="processing-row">
+          <div class="spinner"></div>
+          <span>Extracting text, matching sections against the stored baseline, running the diff…</span>
+        </div>
+      </div>
+
+      <div id="compare-results" class="hidden">
+        <div class="ad-toolbar" style="margin-top:16px;">
+          <select class="select-inline"><option>Month-End Variance Reconciliation</option></select>
+          <span class="vs">comparing</span>
+          <select class="select-inline"><option>v2.3 (stored baseline)</option></select>
+          <span class="vs">→</span>
+          <select class="select-inline"><option>v2.4 (just uploaded)</option></select>
+          <button class="btn" style="margin-left:auto;">Re-run analysis</button>
+        </div>
+
+        <div class="ad-columns">
+          <div>
+            <div class="panel">
+              <h3>Redline view</h3>
+              <p class="sub">Step 2 of the procedure, old vs. new</p>
+              <div class="redline"><span class="ctx-line">STEP 02 — Flag variances above threshold</span><span class="del-line">Highlight any line item where variance exceeds 8% or $50K, whichever is lower.</span><span class="add-line">Highlight any line item where variance exceeds 12% or $75K, whichever is lower.</span><span class="ctx-line">STEP 03 — Route to regional lead for sign-off</span><span class="add-line">If the item touches an intercompany account, also CC the controllership mailbox.</span><span class="ctx-line">Send the flagged summary for approval before it is included in the consolidated report.</span></div>
+            </div>
+          </div>
+
+          <div>
+            <h3 style="font-size:13.5px; margin:0 0 4px 2px;">What changed &amp; why it matters</h3>
+            <p class="sub" style="margin:0 0 12px 2px;">Generated from the retrieved sections above — mark each one once you've reviewed it.</p>
+
+            <div class="note-card" data-note="1">
+              <div class="note-head">
+                <span class="note-title">Threshold loosened</span>
+                <span class="sev sev-critical">Critical</span>
+              </div>
+              <div class="tag-row"><span class="type-tag t-numeric">● Numeric / threshold</span></div>
+              <div class="note-body">The variance trigger moved from 8% / $50K to 12% / $75K. Items that used to require sign-off can now pass silently — this changes what gets escalated, not just wording.</div>
+              <div class="note-src">↳ matched against Step 02, v2.3</div>
+              <div class="auditor-box">
+                <div class="auditor-label">Auditor review</div>
+                <div class="auditor-btns">
+                  <button class="mark-btn mb-ack">✓ Acknowledge</button>
+                  <button class="mark-btn mb-flag">⚑ Flag as risk</button>
+                  <button class="mark-btn mb-note">＋ Add note</button>
+                </div>
+                <textarea class="auditor-note" placeholder="Why are you flagging or acknowledging this change?"></textarea>
+                <div class="mark-status"></div>
+              </div>
+            </div>
+
+            <div class="note-card" data-note="2">
+              <div class="note-head">
+                <span class="note-title">New routing rule added</span>
+                <span class="sev sev-moderate">Moderate</span>
+              </div>
+              <div class="tag-row"><span class="type-tag t-routing">● Routing / ownership</span></div>
+              <div class="note-body">Intercompany items now also require CC to controllership — a new stakeholder was added to the approval path that didn't exist before.</div>
+              <div class="note-src">↳ matched against Step 03, v2.3</div>
+              <div class="auditor-box">
+                <div class="auditor-label">Auditor review</div>
+                <div class="auditor-btns">
+                  <button class="mark-btn mb-ack">✓ Acknowledge</button>
+                  <button class="mark-btn mb-flag">⚑ Flag as risk</button>
+                  <button class="mark-btn mb-note">＋ Add note</button>
+                </div>
+                <textarea class="auditor-note" placeholder="Why are you flagging or acknowledging this change?"></textarea>
+                <div class="mark-status"></div>
+              </div>
+            </div>
+
+            <div class="note-card" data-note="3">
+              <div class="note-head">
+                <span class="note-title">Owner &amp; formatting</span>
+                <span class="sev sev-minor">Minor</span>
+              </div>
+              <div class="tag-row"><span class="type-tag t-wording">● Wording only</span></div>
+              <div class="note-body">Section header casing and step numbering were normalized. No procedural impact.</div>
+              <div class="note-src">↳ matched against document metadata</div>
+              <div class="auditor-box">
+                <div class="auditor-label">Auditor review</div>
+                <div class="auditor-btns">
+                  <button class="mark-btn mb-ack">✓ Acknowledge</button>
+                  <button class="mark-btn mb-flag">⚑ Flag as risk</button>
+                  <button class="mark-btn mb-note">＋ Add note</button>
+                </div>
+                <textarea class="auditor-note" placeholder="Why are you flagging or acknowledging this change?"></textarea>
+                <div class="mark-status"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('.nav-item');
+  const views = { builder: document.getElementById('view-builder'),
+                   manager: document.getElementById('view-manager'),
+                   anomaly: document.getElementById('view-anomaly') };
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      Object.values(views).forEach(v => v.classList.add('hidden'));
+      views[tab.dataset.tab].classList.remove('hidden');
+    });
+  });
+
+  // ---- Anomaly Detector: upload -> "store" -> compare simulation ----
+  const fileNew = document.getElementById('file-new');
+  const slotNew = document.getElementById('slot-new');
+  const processingRow = document.getElementById('processing-row');
+  const compareResults = document.getElementById('compare-results');
+
+  fileNew.addEventListener('change', () => {
+    if (!fileNew.files.length) return;
+    const file = fileNew.files[0];
+
+    // Show the file as "uploaded" in the new-upload slot
+    slotNew.classList.add('filled');
+    slotNew.innerHTML = `
+      <span class="slot-label">New upload</span>
+      <div class="file-chip">
+        <div class="fico">PDF</div>
+        <div>
+          <div class="fname">${file.name}</div>
+          <div class="fmeta">matched to stored baseline · comparing now</div>
+        </div>
+      </div>`;
+
+    processingRow.classList.remove('hidden');
+    compareResults.classList.add('hidden');
+
+    // Simulated pipeline: extract -> match sections (RAG) -> diff -> summarize
+    setTimeout(() => {
+      processingRow.classList.add('hidden');
+      compareResults.classList.remove('hidden');
+      compareResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 1400);
+  });
+
+  // ---- Auditor marking controls ----
+  document.querySelectorAll('.note-card').forEach(card => {
+    const ackBtn = card.querySelector('.mb-ack');
+    const flagBtn = card.querySelector('.mb-flag');
+    const noteBtn = card.querySelector('.mb-note');
+    const noteBox = card.querySelector('.auditor-note');
+    const status = card.querySelector('.mark-status');
+
+    function setStatus(text) {
+      status.textContent = text;
+    }
+
+    ackBtn.addEventListener('click', () => {
+      ackBtn.classList.toggle('is-active');
+      flagBtn.classList.remove('is-active');
+      setStatus(ackBtn.classList.contains('is-active') ? 'Acknowledged by You · just now' : '');
+    });
+
+    flagBtn.addEventListener('click', () => {
+      flagBtn.classList.toggle('is-active');
+      ackBtn.classList.remove('is-active');
+      setStatus(flagBtn.classList.contains('is-active') ? 'Flagged as risk by You · just now' : '');
+    });
+
+    noteBtn.addEventListener('click', () => {
+      noteBtn.classList.toggle('is-active');
+      noteBox.classList.toggle('show');
+      if (noteBox.classList.contains('show')) noteBox.focus();
+    });
+  });
+</script>
+</body>
+</html>
